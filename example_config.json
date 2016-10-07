@@ -1,0 +1,17 @@
+{
+    "engine": {
+        "thrust": 333
+    },
+    "propellant": {
+        "expected_isp": 321,
+        "mixture_ratio": 1.2,
+        "fuel": {
+            "name": "methanol",
+            "molar_mass": 123.456
+        },
+        "oxidizer": {
+            "name": "gox",
+            "molar_mass": 123.456
+        }
+    }
+}

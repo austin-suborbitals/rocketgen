@@ -1,0 +1,9 @@
+[submodule "src/ext/phys_units"]
+	path = src/ext/phys_units
+	url = https://github.com/martinmoene/PhysUnits-CT-Cpp11
+[submodule "src/ext/cxxopts"]
+	path = src/ext/cxxopts
+	url = https://github.com/jarro2783/cxxopts
+[submodule "src/ext/json"]
+	path = src/ext/json
+	url = https://github.com/nlohmann/json

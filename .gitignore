@@ -1,0 +1,8 @@
+bin/
+
+*.o
+*.a
+*.s
+*.dblite
+*.swo
+*.swp
