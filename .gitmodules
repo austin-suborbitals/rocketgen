@@ -7,3 +7,6 @@
 [submodule "src/ext/json"]
 	path = src/ext/json
 	url = https://github.com/nlohmann/json
+[submodule "src/ext/cpplatex"]
+	path = src/ext/cpplatex
+	url = https://github.com/zmarcantel/cpplatex

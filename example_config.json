@@ -1,9 +1,19 @@
 {
+    "name": "Arwen",
+    "version": "0.1.0",
     "engine": {
-        "thrust": 333
+        "_": "thrust is in Netwons",
+        "thrust": 335,
+
+        "_": "isp is in second",
+        "isp": 248,
+
+        "_": "pressure is in MPa",
+        "chamber_pressure": 2.068
     },
+
+    "_": "molar masses are in g/mol",
     "propellant": {
-        "expected_isp": 321,
         "mixture_ratio": 1.2,
         "fuel": {
             "name": "methanol",

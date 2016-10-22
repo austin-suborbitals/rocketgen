@@ -21,6 +21,7 @@ COMMONFLAGS=[
     '-Wall',
     '-Wextra',
     '-Werror',
+    '-I{}'.format(os.path.join(Dir('#').abspath, 'src/')),
 ]
 
 CPPPATH = [
@@ -29,7 +30,7 @@ CPPPATH = [
 
 CPPFLAGS = [
     # required C++ flags
-    '-std=c++11',
+    '-std=c++14',
     '-I{}'.format(os.path.join(Dir('#').abspath, 'src/ext/phys_units')),   # to satisfy the inter-including
 ]
 

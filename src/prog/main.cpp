@@ -1,8 +1,9 @@
-#include "../ext/cxxopts/src/cxxopts.hpp"
-#include "../ext/json/src/json.hpp"
+#include "ext/cxxopts/src/cxxopts.hpp"
+#include "ext/json/src/json.hpp"
+
+#include "lib/rocketgen.hpp"
 
 #include "util.hpp"
-#include "../lib/rocketgen.hpp"
 
 using namespace nlohmann; // get access to bare json:: namespace
 
@@ -35,20 +36,80 @@ cxxopts::Options handle_options(int argc, char** argv) {
     return opts;
 }
 
+EngineBasis marshal_config(const json& conf) {
+    Fuel fuel{
+        conf["propellant"]["fuel"]["name"].get<std::string>(),
+        conf["propellant"]["fuel"]["molar_mass"].get<double>()
+    };
+
+    Oxidizer oxidizer{
+        conf["propellant"]["oxidizer"]["name"].get<std::string>(),
+        conf["propellant"]["oxidizer"]["molar_mass"].get<double>()
+    };
+
+    return EngineBasis(
+        conf["name"].get<std::string>(),
+        conf["version"].get<std::string>(),
+        conf["engine"]["thrust"].get<double>(),
+        conf["engine"]["isp"].get<double>(),
+        conf["engine"]["chamber_pressure"].get<double>(),
+        Propellants{fuel, oxidizer, conf["propellant"]["mixture_ratio"].get<double>()}
+    );
+}
+
+void build_overview(latex::doc::Report& doc, const EngineBasis& rocket) {
+    using namespace latex;
+    using PrefixText = Text<style::Larger, style::Bold>;
+
+    auto total_flow_rate = rocket.thrust / (rocket.isp * GRAVITY);
+    auto fuel_flow_rate = total_flow_rate / (rocket.propellants.mixture_ratio + 1); // TODO: +1?
+
+    latex::doc::Section overview("Overview");
+    overview
+        << "A brief overview of the target-metrics for the engine." << "\n\n"
+        << (latex::doc::UnorderedList()
+                << strjoin(PrefixText("Thrust: "), rocket.thrust)
+                << strjoin(PrefixText("Isp: "), rocket.isp)
+                << strjoin(PrefixText("Chamber Pressure: "), rocket.pressure)
+                << PrefixText("Propellants: ")
+                << (doc::UnorderedList()
+                    << strjoin(PrefixText("Mixture Ratio: "), rocket.propellants.mixture_ratio)
+                    << strjoin(PrefixText("Total Mass Flow Rate: "), total_flow_rate.solve())
+                    << PrefixText("Fuel: ")
+                    << (doc::UnorderedList()
+                        << strjoin(PrefixText("Type: "), rocket.propellants.fuel.name)
+                        << strjoin(PrefixText("Mass Flow Rate: "), fuel_flow_rate.solve())
+                    )
+                    << PrefixText("Oxidizer: ")
+                    << (doc::UnorderedList()
+                        << strjoin(PrefixText("Type: "), rocket.propellants.oxidizer.name)
+                        << strjoin(PrefixText("Mass Flow Rate: "), (total_flow_rate - fuel_flow_rate).solve())
+                    )
+                )
+           );
+
+    doc << overview;
+}
+
+
 int main(int argc, char** argv) {
     auto opts = handle_options(argc, argv);
     auto conf_str = read_file(opts["config"].as<std::string>());
-    auto conf = json::parse(conf_str);
+    auto rocket = marshal_config(json::parse(conf_str));
 
-    auto thrust = conf["engine"]["thrust"].get<double>() * newton;
-    auto isp = conf["propellant"]["expected_isp"].get<double>() * second;
+    latex::doc::Report doc(
+        strjoin(rocket.name, rocket.version),
+        strjoin(
+            rocket.thrust,
+            rocket.propellants.fuel.name, "/", rocket.propellants.oxidizer.name,
+            "Liquid Rocket Engine"
+        )
+    );
 
-    auto total_flow_rate = thrust / (isp * GRAVITY);
-    auto fuel_flow_rate = total_flow_rate / (conf["propellant"]["mixture_ratio"].get<double>() + 1); // TODO: +1?
+    // build and append the overview
+    build_overview(doc, rocket);
 
-    std::cout << "Total propellant flow rate: " << total_flow_rate << std::endl;
-    std::cout << "Fuel flow rate: " << fuel_flow_rate << std::endl;
-    std::cout << "Oxidizer flow rate: " << (total_flow_rate - fuel_flow_rate) << std::endl;
+    std::cout << doc << std::endl;
 
     return 0;
 }
