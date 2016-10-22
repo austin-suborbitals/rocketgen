@@ -61,7 +61,7 @@ void build_overview(latex::doc::Report& doc, const EngineBasis& rocket) {
     using namespace latex;
     using PrefixText = Text<style::Larger, style::Bold>;
 
-    auto total_flow_rate = rocket.thrust / (rocket.isp * GRAVITY);
+    auto total_flow_rate = rocket.thrust / (GRAVITY * rocket.isp);
     auto fuel_flow_rate = total_flow_rate / (rocket.propellants.mixture_ratio + 1); // TODO: +1?
 
     latex::doc::Section overview("Overview");
@@ -70,20 +70,20 @@ void build_overview(latex::doc::Report& doc, const EngineBasis& rocket) {
         << (latex::doc::UnorderedList()
                 << strjoin(PrefixText("Thrust: "), rocket.thrust)
                 << strjoin(PrefixText("Isp: "), rocket.isp)
-                << strjoin(PrefixText("Chamber Pressure: "), rocket.pressure)
+                << strjoin(PrefixText("Chamber Pressure: "), eng::to_string(rocket.pressure))
                 << PrefixText("Propellants: ")
                 << (doc::UnorderedList()
                     << strjoin(PrefixText("Mixture Ratio: "), rocket.propellants.mixture_ratio)
-                    << strjoin(PrefixText("Total Mass Flow Rate: "), total_flow_rate.solve())
+                    << strjoin(PrefixText("Total Mass Flow Rate: "), total_flow_rate)
                     << PrefixText("Fuel: ")
                     << (doc::UnorderedList()
                         << strjoin(PrefixText("Type: "), rocket.propellants.fuel.name)
-                        << strjoin(PrefixText("Mass Flow Rate: "), fuel_flow_rate.solve())
+                        << strjoin(PrefixText("Mass Flow Rate: "), fuel_flow_rate)
                     )
                     << PrefixText("Oxidizer: ")
                     << (doc::UnorderedList()
                         << strjoin(PrefixText("Type: "), rocket.propellants.oxidizer.name)
-                        << strjoin(PrefixText("Mass Flow Rate: "), (total_flow_rate - fuel_flow_rate).solve())
+                        << strjoin(PrefixText("Mass Flow Rate: "), (total_flow_rate - fuel_flow_rate))
                     )
                 )
            );

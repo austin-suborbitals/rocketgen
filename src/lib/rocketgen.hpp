@@ -7,7 +7,7 @@
 #include "ext/phys_units/phys/units/io.hpp"
 
 using namespace phys::units;
-using namespace phys::units::io::eng;
+using namespace phys::units::io;
 
 #include "ext/cpplatex/latex.hpp"
 
@@ -19,8 +19,8 @@ using namespace phys::units::io::eng;
 #define POW(x,y)    latex::math::make_exp(x,y)
 #define ROOT(x,y)   latex::math::make_root(x,y)
 
-const static auto GRAVITY = NUM(9.81 * (meter / (second * second)));
-const static auto UNIVERSAL_GAS_CONSTANT = NUM((8.31446 * joule) / (mole * kelvin));
+const static auto GRAVITY = 9.81 * (meter / (second * second));
+const static auto UNIVERSAL_GAS_CONSTANT = (8.31446 * joule) / (mole * kelvin);
 
 struct Fuel {
     std::string name;
@@ -58,6 +58,5 @@ public:
         , propellants(prop)
     {}
 };
-
 
 #endif
