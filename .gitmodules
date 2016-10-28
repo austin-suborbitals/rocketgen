@@ -1,6 +1,6 @@
 [submodule "src/ext/phys_units"]
 	path = src/ext/phys_units
-	url = https://github.com/martinmoene/PhysUnits-CT-Cpp11
+	url = https://github.com/austin-suborbitals/PhysUnits-CT-Cpp11
 [submodule "src/ext/cxxopts"]
 	path = src/ext/cxxopts
 	url = https://github.com/jarro2783/cxxopts

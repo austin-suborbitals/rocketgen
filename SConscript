@@ -22,6 +22,9 @@ COMMONFLAGS=[
     '-Wextra',
     '-Werror',
     '-I{}'.format(os.path.join(Dir('#').abspath, 'src/')),
+
+    # phys units degree symbol
+    '-Wno-invalid-source-encoding',
 ]
 
 CPPPATH = [
@@ -106,7 +109,6 @@ AddMethod(Environment, get_files)
 builds = [
     # add jobs here
     'src/prog',
-    'src/lib',
 ]
 for b in builds:
     idir =  os.path.join(Dir('#').abspath, b)

@@ -1,9 +1,7 @@
 #include "ext/cxxopts/src/cxxopts.hpp"
 #include "ext/json/src/json.hpp"
 
-#include "lib/rocketgen.hpp"
-
-#include "util.hpp"
+#include "rocketgen.hpp"
 
 using namespace nlohmann; // get access to bare json:: namespace
 
@@ -47,34 +45,44 @@ EngineBasis marshal_config(const json& conf) {
         conf["propellant"]["oxidizer"]["molar_mass"].get<double>()
     };
 
+    auto thrust = (conf["engine"]["thrust"].get<double>() * newton);
+    auto isp = conf["engine"]["isp"].get<double>();
+
     return EngineBasis(
         conf["name"].get<std::string>(),
         conf["version"].get<std::string>(),
-        conf["engine"]["thrust"].get<double>(),
-        conf["engine"]["isp"].get<double>(),
-        conf["engine"]["chamber_pressure"].get<double>(),
-        Propellants{fuel, oxidizer, conf["propellant"]["mixture_ratio"].get<double>()}
+        thrust, isp,
+        (conf["engine"]["chamber_pressure"].get<double>() * 1'000'000) * pascal,
+        (conf["engine"]["external_pressure"].get<double>() * 1'000'000) * pascal,
+        Propellants{
+            fuel, oxidizer,
+            conf["propellant"]["mixture_ratio"].get<double>(),
+            conf["propellant"]["gamma"].get<double>(),
+            conf["propellant"]["avg_combustion_weight"].get<double>() * gram,
+            (conf["propellant"]["flame_temp"].get<double>() + 273.15) * kelvin
+        }
     );
 }
 
 void build_overview(latex::doc::Report& doc, const EngineBasis& rocket) {
     using namespace latex;
-    using PrefixText = Text<style::Larger, style::Bold>;
+    using PrefixText = Text<style::Large, style::Bold>;
 
-    auto total_flow_rate = rocket.thrust / (GRAVITY * rocket.isp);
-    auto fuel_flow_rate = total_flow_rate / (rocket.propellants.mixture_ratio + 1); // TODO: +1?
+    auto mass_flow = calc_mass_flow(rocket.thrust, rocket.isp);
+    auto fuel_flow_rate = mass_flow / (rocket.propellants.mixture_ratio + 1); // TODO: +1?
 
-    latex::doc::Section overview("Overview");
+    latex::doc::Section overview("Overview", true);
     overview
         << "A brief overview of the target-metrics for the engine." << "\n\n"
+        << vspace
         << (latex::doc::UnorderedList()
                 << strjoin(PrefixText("Thrust: "), rocket.thrust)
                 << strjoin(PrefixText("Isp: "), rocket.isp)
-                << strjoin(PrefixText("Chamber Pressure: "), eng::to_string(rocket.pressure))
+                << strjoin(PrefixText("Chamber Pressure: "), rocket.pressure)
                 << PrefixText("Propellants: ")
                 << (doc::UnorderedList()
                     << strjoin(PrefixText("Mixture Ratio: "), rocket.propellants.mixture_ratio)
-                    << strjoin(PrefixText("Total Mass Flow Rate: "), total_flow_rate)
+                    << strjoin(PrefixText("Total Mass Flow Rate: "), mass_flow)
                     << PrefixText("Fuel: ")
                     << (doc::UnorderedList()
                         << strjoin(PrefixText("Type: "), rocket.propellants.fuel.name)
@@ -83,7 +91,7 @@ void build_overview(latex::doc::Report& doc, const EngineBasis& rocket) {
                     << PrefixText("Oxidizer: ")
                     << (doc::UnorderedList()
                         << strjoin(PrefixText("Type: "), rocket.propellants.oxidizer.name)
-                        << strjoin(PrefixText("Mass Flow Rate: "), (total_flow_rate - fuel_flow_rate))
+                        << strjoin(PrefixText("Mass Flow Rate: "), (mass_flow - fuel_flow_rate))
                     )
                 )
            );
@@ -97,17 +105,19 @@ int main(int argc, char** argv) {
     auto conf_str = read_file(opts["config"].as<std::string>());
     auto rocket = marshal_config(json::parse(conf_str));
 
-    latex::doc::Report doc(
+    auto doc = Report(
         strjoin(rocket.name, rocket.version),
         strjoin(
             rocket.thrust,
             rocket.propellants.fuel.name, "/", rocket.propellants.oxidizer.name,
             "Liquid Rocket Engine"
         )
-    );
+    )
+    .use("amsmath");
 
     // build and append the overview
     build_overview(doc, rocket);
+    build_throat(doc, rocket);
 
     std::cout << doc << std::endl;
 

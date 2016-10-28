@@ -9,12 +9,25 @@
         "isp": 248,
 
         "_": "pressure is in MPa",
-        "chamber_pressure": 2.068
+        "chamber_pressure": 2.068,
+
+        "_": "external pressure is in MPa",
+        "external_pressure": 0.1013529
     },
 
     "_": "molar masses are in g/mol",
     "propellant": {
+        "_": "gamma is in unitless",
+        "gamma": 1.2,
+
+        "_": "flame tempurature is in kelvin",
+        "flame_temp": 3048.889,
+
+        "_": "mixture ratio is unitless",
         "mixture_ratio": 1.2,
+
+        "_": "average combustion weight is in g/mol",
+        "avg_combustion_weight": 26.68,
         "fuel": {
             "name": "methanol",
             "molar_mass": 123.456
