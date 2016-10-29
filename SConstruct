@@ -35,6 +35,13 @@ AddOption('--update',
 )
 
 
+def needs_update(subs):
+    for mod in submodules:
+        if GetOption('update') or not len([f for f in os.listdir(mod) if os.path.isfile(os.path.join(mod, f))]):
+            return True
+    return False
+
+
 # initialize submodules
 get_subs_cmd = [
     ['git', 'config', '--file', os.path.join(Dir('#').abspath, '.gitmodules'), '--name-only', '--get-regexp', 'path'],
@@ -46,11 +53,9 @@ filter_sub = subprocess.Popen(get_subs_cmd[1], stdin=get_subs.stdout, stdout=sub
 get_subs.wait()
 filter_sub.wait()
 submodules = filter(None, subprocess.check_output(get_subs_cmd[2], stdin=filter_sub.stdout).split('\n'))
-for mod in submodules:
-    if GetOption('update') or not len([f for f in os.listdir(mod) if os.path.isfile(os.path.join(mod, f))]):
-        subprocess.check_call(['git', 'submodule', 'init'])
-        subprocess.check_call(['git', 'submodule', 'update'])
-        break
+if GetOption('update') or needs_update(submodules):
+    subprocess.check_call(['git', 'submodule', 'init'])
+    subprocess.check_call(['git', 'submodule', 'update'])
 
 env = Environment()
 
