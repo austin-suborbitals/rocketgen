@@ -48,12 +48,13 @@ EngineBasis marshal_config(const json& conf) {
     auto thrust = (conf["engine"]["thrust"].get<double>() * newton);
     auto isp = conf["engine"]["isp"].get<double>();
 
-    return EngineBasis(
+    return EngineBasis{
         conf["name"].get<std::string>(),
         conf["version"].get<std::string>(),
-        thrust, isp,
-        (conf["engine"]["chamber_pressure"].get<double>() * 1'000'000) * pascal,
-        (conf["engine"]["external_pressure"].get<double>() * 1'000'000) * pascal,
+        thrust, isp*second,
+        (conf["engine"]["chamber_pressure"].get<double>() * MPa),
+        (conf["engine"]["external_pressure"].get<double>() * MPa),
+        conf["engine"]["expansion_ratio"].get<double>(),
         Propellants{
             fuel, oxidizer,
             conf["propellant"]["mixture_ratio"].get<double>(),
@@ -61,12 +62,11 @@ EngineBasis marshal_config(const json& conf) {
             conf["propellant"]["avg_combustion_weight"].get<double>() * gram,
             (conf["propellant"]["flame_temp"].get<double>() + 273.15) * kelvin
         }
-    );
+    };
 }
 
 void build_overview(latex::doc::Report& doc, const EngineBasis& rocket) {
-    using namespace latex;
-    using PrefixText = Text<style::Large, style::Bold>;
+    using PrefixText = latex::Text<latex::style::Large, latex::style::Bold>;
 
     auto mass_flow = calc_mass_flow(rocket.thrust, rocket.isp);
     auto fuel_flow_rate = mass_flow / (rocket.propellants.mixture_ratio + 1); // TODO: +1?
@@ -78,18 +78,18 @@ void build_overview(latex::doc::Report& doc, const EngineBasis& rocket) {
         << (latex::doc::UnorderedList()
                 << strjoin(PrefixText("Thrust: "), rocket.thrust)
                 << strjoin(PrefixText("Isp: "), rocket.isp)
-                << strjoin(PrefixText("Chamber Pressure: "), rocket.pressure)
+                << strjoin(PrefixText("Chamber Pressure: "), eng::to_string(rocket.pressure))
                 << PrefixText("Propellants: ")
-                << (doc::UnorderedList()
+                << (latex::doc::UnorderedList()
                     << strjoin(PrefixText("Mixture Ratio: "), rocket.propellants.mixture_ratio)
                     << strjoin(PrefixText("Total Mass Flow Rate: "), mass_flow)
                     << PrefixText("Fuel: ")
-                    << (doc::UnorderedList()
+                    << (latex::doc::UnorderedList()
                         << strjoin(PrefixText("Type: "), rocket.propellants.fuel.name)
                         << strjoin(PrefixText("Mass Flow Rate: "), fuel_flow_rate)
                     )
                     << PrefixText("Oxidizer: ")
-                    << (doc::UnorderedList()
+                    << (latex::doc::UnorderedList()
                         << strjoin(PrefixText("Type: "), rocket.propellants.oxidizer.name)
                         << strjoin(PrefixText("Mass Flow Rate: "), (mass_flow - fuel_flow_rate))
                     )
@@ -117,7 +117,8 @@ int main(int argc, char** argv) {
 
     // build and append the overview
     build_overview(doc, rocket);
-    build_throat(doc, rocket);
+    auto throat = build_throat(doc, rocket);
+    build_nozzle(doc, rocket, throat);
 
     std::cout << doc << std::endl;
 

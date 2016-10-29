@@ -2,6 +2,9 @@
 
 set -e
 
+OPTS=-d
+CONVTOOL=rubber
+
 TEXFILE=rocket.tex
 
 CONF=$1
@@ -12,4 +15,4 @@ fi
 
 ./bin/prog/rocketgen -c $CONF > $TEXFILE
 
-pdflatex $TEXFILE
+$CONVTOOL $OPTS $TEXFILE

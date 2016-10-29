@@ -29,6 +29,10 @@ AddOption('--valgrind',
     action='store_true',
     help='run the tests under valgrind'
 )
+AddOption('--update',
+    action='store_true',
+    help='init and update any submodules'
+)
 
 
 # initialize submodules
@@ -43,9 +47,9 @@ get_subs.wait()
 filter_sub.wait()
 submodules = filter(None, subprocess.check_output(get_subs_cmd[2], stdin=filter_sub.stdout).split('\n'))
 for mod in submodules:
-    if not len([f for f in os.listdir(mod) if os.path.isfile(os.path.join(mod, f))]):
+    if GetOption('update') or not len([f for f in os.listdir(mod) if os.path.isfile(os.path.join(mod, f))]):
         subprocess.check_call(['git', 'submodule', 'init'])
-        subprocess.check_call(['git', 'submodule', 'update', '--depth', '1'])
+        subprocess.check_call(['git', 'submodule', 'update'])
         break
 
 env = Environment()
