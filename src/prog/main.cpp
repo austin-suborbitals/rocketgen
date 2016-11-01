@@ -56,7 +56,7 @@ EngineBasis marshal_config(const json& conf) {
         (conf["engine"]["external_pressure"].get<double>() * MPa),
         conf["engine"]["expansion_ratio"].get<double>(),
         (conf["engine"]["l_star"].get<double>() * meter),
-        conf["engine"]["converging_angle"].get<double>(),
+        TORAD(conf["engine"]["converging_angle"].get<double>()),  // we take in as deg, but calcs need rad
         Propellants{
             fuel, oxidizer,
             conf["propellant"]["mixture_ratio"].get<double>(),

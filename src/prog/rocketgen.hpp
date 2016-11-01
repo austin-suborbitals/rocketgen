@@ -73,12 +73,17 @@ public:
 #define COS(x)      make_cos(x)
 #define TAN(x)      make_tan(x)
 
+#define TORAD(x)    (x*(M_PI/180))
+#define TODEG(x)    (x*(180/M_PI))
+
 const static auto GRAVITY = 9.81 * (meter / (second * second));
 const static auto GAS_CONSTANT = 8.31446 * (((meter * meter * meter) * pascal) / (mole * kelvin));
 
-template <typename T, typename C, typename N, typename S>
-std::string scale_to_string(const T& val, const C& cutoff, const N& new_scale, const S& unit_str) {
-    return magnitude(val) > cutoff ? to_string(val) : strjoin(val.to(new_scale) /* returns a num */, unit_str);
+template <typename T, typename C, typename N>
+std::string scale_to_string(const T& val, const C& cutoff, const N& new_scale, const char* unit_str) {
+    return magnitude(val) > cutoff
+        ? to_string(val)
+        : strjoin(val.to(new_scale) /* returns a num */, unit_str);
 }
 
 
@@ -195,7 +200,7 @@ auto build_throat_area_section(O& os, const EngineBasis& rocket, const T& temp, 
     << vspace;
 
 
-    auto pi_var = StyledConst<double>(M_PI, "pi");
+    auto pi_var = StyledConst<double>(M_PI, "\\pi");
     auto radius_eqn = (NUM(area) / pi_var).sqrt();
     auto radius = radius_eqn.solve();
     auto diameter_eqn = StyledValVar<decltype(radius)>(radius, "r_{throat}") * NUM(2);
@@ -342,7 +347,7 @@ Nozzle build_nozzle(latex::doc::Report& doc, const EngineBasis& rocket, const Th
     auto exit_area_eqn = area_throat * NUM(rocket.expansion_ratio);
     auto exit_area = exit_area_eqn.solve();
 
-    auto pi_var = StyledConst<double>(M_PI, "pi");
+    auto pi_var = StyledConst<double>(M_PI, "\\pi");
     auto radius_eqn = (NUM(exit_area) / pi_var).sqrt();
     auto radius = radius_eqn.solve();
     auto diameter_eqn = StyledValVar<decltype(radius)>(radius, "r") * NUM(2);
@@ -427,23 +432,46 @@ Chamber build_chamber(latex::doc::Report& doc, const EngineBasis& rocket, const 
     auto initial_est_eqn = EXP(NUM(0.029)*LOGN(diameter_throat).pow(2) + NUM(0.047)*LOGN(diameter_throat) + NUM(1.94));
     auto initial_est = (initial_est_eqn.solve() * (meter / 100)); // TODO: why centimeters?
 
-    auto pi_var = StyledConst<double>(M_PI, "pi");
+    auto pi_var = StyledConst<double>(M_PI, "\\pi");
     auto angle_var = StyledConst<double>(rocket.converging_angle, "\\theta");
     StyledValVar<decltype(volume)> volume_var(volume, "V_{chamber}");
-    StyledValVar<decltype(initial_est)> length_var(initial_est, "L_{chamber}");
+    StyledValVar<decltype(initial_est)> length_var(initial_est, "L_{estimate}");
 
     auto initial_radius = sqrt((volume/initial_est)/M_PI);
-    StyledValVar<decltype(initial_est)> diameter_var(2*initial_radius, "D_{chamber}");
+    StyledValVar<decltype(initial_est)> diameter_var(2*initial_radius, "D_{estimate}");
 
-    auto iter_eqn = (
-        (diameter_throat.pow(3) + (NUM(24)/pi_var) * TAN(angle_var) * volume_var)
+    auto iter_eqn = [&](double iter_val){
+        return
+        ((diameter_throat.pow(3) + ((NUM(24)/pi_var) * TAN(angle_var) * volume_var))
         /
-        (diameter_var + NUM(6) * TAN(angle_var) * length_var) // TODO: always use initial? or Lc=Vc/calc(Dc)?
-    ); // TODO: sqrt here not below
+        (iter_val + (NUM(6) * TAN(angle_var) * length_var))) // TODO: always use initial? or Lc=Vc/calc(Dc)?
+        .sqrt();
+    };
 
-    std::size_t num_iters = 1;
+    std::size_t num_iters = 100;
+    auto initial_iter_eqn = iter_eqn(diameter_var.solve()); // TODO: explain the static value
+    auto diam_iter = iter_eqn(diameter_var.solve()).solve();
+    for (std::size_t i = 1; i < num_iters; ++i) {
+        diam_iter = iter_eqn(diam_iter).solve();
+    }
 
-    auto area_eqn = (diameter_var/2).pow(2)*pi_var;
+    auto diameter = diam_iter*meter;
+    auto radius = diameter / 2;
+
+    auto area_eqn = NUM(nth_power<2>(radius)) * pi_var;
+    auto area = area_eqn.solve();
+    auto area_var = StyledValVar<decltype(area)>(area, "A_{chamber}");
+
+    auto contraction_eqn = area_var / area_throat;
+    auto contraction_ratio = contraction_eqn.solve();
+
+    auto length = volume / area;
+
+    auto converging_height = radius - throat.radius;
+
+    auto converging_length_eqn = (converging_height / SIN(rocket.converging_angle)) * SIN(TORAD(90)-rocket.converging_angle);
+    auto converging_length = converging_length_eqn.solve();
+
 
     geometry
         << vspace
@@ -461,28 +489,68 @@ Chamber build_chamber(latex::doc::Report& doc, const EngineBasis& rocket, const 
             initial_est_eqn,
             scale_to_string(initial_est, 1, mm, "mm")
         )
+        << svspace
+        << make_aligned_eqn(
+            StyledVar("D_{estimate}"),
+            initial_radius*2
+        )
         << "Which we can further refine by solving the following via iteration:\n\n"
         << vspace
-        << make_eqn(diameter_var, iter_eqn.sqrt())
+        << make_eqn(diameter_var, initial_iter_eqn)
         << vspace
         << strjoin("Which yields (after", num_iters, "iterations):\n\n")
         << svspace
-        << make_eqn(diameter_var, sqrt(magnitude(iter_eqn.solve()))*meter)
+        << make_eqn(StyledVar("D_{chamber}"), scale_to_string(diameter, 1, mm, "mm"))
+        << make_eqn(StyledVar("R_{chamber}"), scale_to_string(radius, 1, mm, "mm"))
         << vspace
         << "Giving:\n\n"
         << svspace
         << make_aligned_eqn(
-            StyledVar("A_{chamber}"),
+            area_var,
             area_eqn,
-            area_eqn.solve()
+            scale_to_string(area, 1, mm_sq, "mm+2")
         )
         << svspace
-        << strjoin("Giving a contraction ratio of: $", ((area_eqn.solve()*meter*meter)/area_throat.solve()) , "$\n\n")
+        << "Giving a contraction ratio of:\n\n"
+        << svspace
+        << make_eqn(
+            contraction_eqn,
+            contraction_ratio
+        )
+        << vspace
+        << "We can now find a length for the chamber:\n\n"
+        << svspace
+        << make_aligned_eqn(
+            StyledVar("L_{chamber}"),
+            DIV(volume_var, area_var),
+            DIV(
+                scale_to_string(volume_var.solve(), 1, mm_cu, "mm+3"),
+                scale_to_string(area_var.solve(), 1, mm_sq, "mm+2")
+            ),
+            scale_to_string(length, 1, mm, "mm")
+        )
     ;
 
     section
         << critical_vars
-        << geometry;
+        << geometry
+        << (Subsection("Summary")
+            << vspace
+            << (UnorderedList()
+                << strjoin(PrefixText("Chamber Length:"), scale_to_string(length, 1, mm, "mm"))
+                << strjoin(PrefixText("Chamber Diameter:"), scale_to_string(diameter, 1, mm, "mm"))
+                << strjoin(PrefixText("Chamber Area:"), scale_to_string(area, 1, mm_sq, "mm+2"))
+                << strjoin(PrefixText("Chamber Flat-Wall Length:"), scale_to_string(length-converging_length, 1, mm, "mm"))
+                << strjoin(PrefixText("Converging Height:"), scale_to_string(converging_height, 1, mm, "mm"))
+                << strjoin(PrefixText("Converging Length:"), scale_to_string(converging_length, 1, mm, "mm"))
+            )
+            << svspace
+            << (UnorderedList()
+                << strjoin(PrefixText("Length/Width Ratio:"), length/diameter)
+                << strjoin(PrefixText("Contraction Ratio:"), contraction_ratio)
+            )
+        )
+    ;
 
     doc << section;
     return Chamber{1*meter, 1*meter};
