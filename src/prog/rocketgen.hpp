@@ -18,8 +18,10 @@ constexpr auto pow(const quantity<D,X>& val, P pwr) {
 }
 
 
-auto mm = meter * milli;
+auto mm = meter * milli; // TODO: explain why mult not div
+auto cm = meter * 100;
 auto mm_sq = mm*mm;
+auto mm_cu = mm*mm*mm;
 auto MPa = pascal * 1'000'000;
 
 
@@ -61,8 +63,15 @@ public:
 #define SUB(x,y)    make_sub(x,y)
 #define MULT(x,y)   make_mult(x,y)
 #define DIV(x,y)    make_fraction(x,y)
-#define POW(x,y)    make_exp(x,y)
+#define POW(x,y)    make_pow(x,y)
+#define EXP(x)      make_exp(x)
+#define LOG(x,y)    make_log(x,y)
+#define LOGN(x)     make_ln(x)
 #define ROOT(x,y)   make_root(x,y)
+#define PAREN(x)    make_paren(x)
+#define SIN(x)      make_sin(x)
+#define COS(x)      make_cos(x)
+#define TAN(x)      make_tan(x)
 
 const static auto GRAVITY = 9.81 * (meter / (second * second));
 const static auto GAS_CONSTANT = 8.31446 * (((meter * meter * meter) * pascal) / (mole * kelvin));
@@ -107,6 +116,8 @@ struct EngineBasis {
     quantity<pressure_d>       pressure;
     quantity<pressure_d>       external_pressure;
     double                     expansion_ratio;
+    quantity<length_d>         l_star;
+    double                     converging_angle;
     Propellants                propellants;
 };
 
@@ -370,6 +381,112 @@ Nozzle build_nozzle(latex::doc::Report& doc, const EngineBasis& rocket, const Th
     return Nozzle{throat.radius, radius};
 }
 
+
+
+
+
+
+
+
+struct Chamber {
+    quantity<length_d> radius;
+    quantity<length_d> length;
+};
+
+Chamber build_chamber(latex::doc::Report& doc, const EngineBasis& rocket, const Throat& throat) {
+    using PrefixText = latex::Text<latex::style::Bold>;
+
+    // open the section
+    latex::doc::Section section("Combustion Chamber", true);
+    section << "Defining characteristics and calculations for the combustion chamber.\n";
+
+    // list our critical constants
+    Subsection critical_vars("Critical Constants");
+    critical_vars << "Underlying constants that form the combustion chamber profile:";
+    critical_vars << (UnorderedList()
+                        << strjoin(PrefixText("Throat Area: "), scale_to_string(throat.area(), 1, mm_sq, "mm+2"))
+                        << strjoin(PrefixText("Throat Dimeter: "), scale_to_string(throat.diameter(), 1, mm, "mm"))
+                        << strjoin(PrefixText("Converging Angle ($\\theta$): "), rocket.converging_angle, "\\degree")
+                        << strjoin(PrefixText("L*: "), scale_to_string(rocket.l_star, 1, mm, "mm"))
+                     );
+
+    //
+    // geometry
+    //
+
+    Subsection geometry("Combustion Chamber Geometry");
+    geometry << "The following equations define the geometrical/physical dimensions of the chamber and converging portion of the nozzle.\n\n\n";
+
+    StyledValVar<decltype(throat.area())> area_throat(throat.area(), "A_{throat}");
+    StyledValVar<decltype(throat.diameter())> diameter_throat(throat.diameter(), "D_{throat}");
+    StyledValVar<quantity<length_d>> l_star_var(rocket.l_star, "L*");
+
+    auto volume_eqn = area_throat * l_star_var;
+    auto volume = volume_eqn.solve();
+
+    auto initial_est_eqn = EXP(NUM(0.029)*LOGN(diameter_throat).pow(2) + NUM(0.047)*LOGN(diameter_throat) + NUM(1.94));
+    auto initial_est = (initial_est_eqn.solve() * (meter / 100)); // TODO: why centimeters?
+
+    auto pi_var = StyledConst<double>(M_PI, "pi");
+    auto angle_var = StyledConst<double>(rocket.converging_angle, "\\theta");
+    StyledValVar<decltype(volume)> volume_var(volume, "V_{chamber}");
+    StyledValVar<decltype(initial_est)> length_var(initial_est, "L_{chamber}");
+
+    auto initial_radius = sqrt((volume/initial_est)/M_PI);
+    StyledValVar<decltype(initial_est)> diameter_var(2*initial_radius, "D_{chamber}");
+
+    auto iter_eqn = (
+        (diameter_throat.pow(3) + (NUM(24)/pi_var) * TAN(angle_var) * volume_var)
+        /
+        (diameter_var + NUM(6) * TAN(angle_var) * length_var) // TODO: always use initial? or Lc=Vc/calc(Dc)?
+    ); // TODO: sqrt here not below
+
+    std::size_t num_iters = 1;
+
+    auto area_eqn = (diameter_var/2).pow(2)*pi_var;
+
+    geometry
+        << vspace
+        << make_aligned_eqn(
+            StyledVar("V_{chamber}"),
+            volume_eqn,
+            MULT(PAREN(area_throat.solve()), PAREN(l_star_var.solve())),
+            scale_to_string(volume, 1, mm_cu, "mm+3")
+        )
+        << vspace
+        << "We achieve an initial approximation of the chamber length from the following formula:\n\n"
+        << svspace
+        << make_aligned_eqn(
+            StyledVar("L_{estimate}"),
+            initial_est_eqn,
+            scale_to_string(initial_est, 1, mm, "mm")
+        )
+        << "Which we can further refine by solving the following via iteration:\n\n"
+        << vspace
+        << make_eqn(diameter_var, iter_eqn.sqrt())
+        << vspace
+        << strjoin("Which yields (after", num_iters, "iterations):\n\n")
+        << svspace
+        << make_eqn(diameter_var, sqrt(magnitude(iter_eqn.solve()))*meter)
+        << vspace
+        << "Giving:\n\n"
+        << svspace
+        << make_aligned_eqn(
+            StyledVar("A_{chamber}"),
+            area_eqn,
+            area_eqn.solve()
+        )
+        << svspace
+        << strjoin("Giving a contraction ratio of: $", ((area_eqn.solve()*meter*meter)/area_throat.solve()) , "$\n\n")
+    ;
+
+    section
+        << critical_vars
+        << geometry;
+
+    doc << section;
+    return Chamber{1*meter, 1*meter};
+}
 
 
 #endif

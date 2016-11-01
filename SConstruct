@@ -54,8 +54,10 @@ get_subs.wait()
 filter_sub.wait()
 submodules = filter(None, subprocess.check_output(get_subs_cmd[2], stdin=filter_sub.stdout).split('\n'))
 if GetOption('update') or needs_update(submodules):
+    print "initializing modules..."
     subprocess.check_call(['git', 'submodule', 'init'])
-    subprocess.check_call(['git', 'submodule', 'update'])
+    print "updating modules..."
+    subprocess.check_call(['git', 'submodule', 'update', '--remote'])
 
 env = Environment()
 
