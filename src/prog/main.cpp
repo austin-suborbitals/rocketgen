@@ -55,6 +55,8 @@ EngineBasis marshal_config(const json& conf) {
         (conf["engine"]["chamber_pressure"].get<double>() * MPa),
         (conf["engine"]["external_pressure"].get<double>() * MPa),
         conf["engine"]["expansion_ratio"].get<double>(),
+        (conf["engine"]["l_star"].get<double>() * meter),
+        TORAD(conf["engine"]["converging_angle"].get<double>()),  // we take in as deg, but calcs need rad
         Propellants{
             fuel, oxidizer,
             conf["propellant"]["mixture_ratio"].get<double>(),
@@ -113,12 +115,14 @@ int main(int argc, char** argv) {
             "Liquid Rocket Engine"
         )
     )
-    .use("amsmath");
+    .use("amsmath")
+    .use("gensymb");
 
     // build and append the overview
     build_overview(doc, rocket);
     auto throat = build_throat(doc, rocket);
     build_nozzle(doc, rocket, throat);
+    build_chamber(doc, rocket, throat);
 
     std::cout << doc << std::endl;
 
