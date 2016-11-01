@@ -411,7 +411,7 @@ Chamber build_chamber(latex::doc::Report& doc, const EngineBasis& rocket, const 
     critical_vars << (UnorderedList()
                         << strjoin(PrefixText("Throat Area: "), scale_to_string(throat.area(), 1, mm_sq, "mm+2"))
                         << strjoin(PrefixText("Throat Dimeter: "), scale_to_string(throat.diameter(), 1, mm, "mm"))
-                        << strjoin(PrefixText("Converging Angle ($\\theta$): "), rocket.converging_angle, "\\degree")
+                        << strjoin(PrefixText("Converging Angle ($\\theta$): "), TODEG(rocket.converging_angle), "\\degree")
                         << strjoin(PrefixText("L*: "), scale_to_string(rocket.l_star, 1, mm, "mm"))
                      );
 
@@ -422,53 +422,64 @@ Chamber build_chamber(latex::doc::Report& doc, const EngineBasis& rocket, const 
     Subsection geometry("Combustion Chamber Geometry");
     geometry << "The following equations define the geometrical/physical dimensions of the chamber and converging portion of the nozzle.\n\n\n";
 
+    // make valued variables for the throat and L* variables
     StyledValVar<decltype(throat.area())> area_throat(throat.area(), "A_{throat}");
     StyledValVar<decltype(throat.diameter())> diameter_throat(throat.diameter(), "D_{throat}");
     StyledValVar<quantity<length_d>> l_star_var(rocket.l_star, "L*");
 
+    // make any other known-constants
+    StyledConst<double> pi_var(M_PI, "\\pi");
+    StyledConst<double> angle_var(rocket.converging_angle, "\\theta");
+
+    // solve for volume
     auto volume_eqn = area_throat * l_star_var;
     auto volume = volume_eqn.solve();
-
-    auto initial_est_eqn = EXP(NUM(0.029)*LOGN(diameter_throat).pow(2) + NUM(0.047)*LOGN(diameter_throat) + NUM(1.94));
-    auto initial_est = (initial_est_eqn.solve() * (meter / 100)); // TODO: why centimeters?
-
-    auto pi_var = StyledConst<double>(M_PI, "\\pi");
-    auto angle_var = StyledConst<double>(rocket.converging_angle, "\\theta");
     StyledValVar<decltype(volume)> volume_var(volume, "V_{chamber}");
-    StyledValVar<decltype(initial_est)> length_var(initial_est, "L_{estimate}");
 
-    auto initial_radius = sqrt((volume/initial_est)/M_PI);
-    StyledValVar<decltype(initial_est)> diameter_var(2*initial_radius, "D_{estimate}");
+    // make an estimate for the chamber length
+    auto initial_len_est_eqn = EXP(NUM(0.029)*LOGN(diameter_throat).pow(2) + NUM(0.047)*LOGN(diameter_throat) + NUM(1.94));
+    auto initial_len_est = (initial_len_est_eqn.solve() * (meter / 100)); // TODO: why centimeters?
+    StyledValVar<decltype(initial_len_est)> initial_length_var(initial_len_est, "L_{estimate}");
 
+    // get a diameter from this estimate
+    auto initial_radius = sqrt((volume/initial_len_est)/M_PI);
+    StyledValVar<decltype(initial_len_est)> est_diameter_var(2*initial_radius, "D_{estimate}");
+
+    // the equation we iterate on to approach a better D_chamber
     auto iter_eqn = [&](double iter_val){
         return
         ((diameter_throat.pow(3) + ((NUM(24)/pi_var) * TAN(angle_var) * volume_var))
         /
-        (iter_val + (NUM(6) * TAN(angle_var) * length_var))) // TODO: always use initial? or Lc=Vc/calc(Dc)?
+        (iter_val + (NUM(6) * TAN(angle_var) * initial_length_var))) // TODO: always use initial? or Lc=Vc/calc(Dc)?
         .sqrt();
     };
 
+    // do the iteration
     std::size_t num_iters = 100;
-    auto initial_iter_eqn = iter_eqn(diameter_var.solve()); // TODO: explain the static value
-    auto diam_iter = iter_eqn(diameter_var.solve()).solve();
+    auto initial_iter_eqn = iter_eqn(est_diameter_var.solve()); // TODO: explain the static value
+    auto diam_iter = iter_eqn(est_diameter_var.solve()).solve();
     for (std::size_t i = 1; i < num_iters; ++i) {
         diam_iter = iter_eqn(diam_iter).solve();
     }
 
+    // solve for the actual diameter and radius
     auto diameter = diam_iter*meter;
     auto radius = diameter / 2;
 
+    // now calculate the area of the (non-converging section) chamber
     auto area_eqn = NUM(nth_power<2>(radius)) * pi_var;
     auto area = area_eqn.solve();
     auto area_var = StyledValVar<decltype(area)>(area, "A_{chamber}");
 
+    // we can also now calc the contraction ratio
     auto contraction_eqn = area_var / area_throat;
     auto contraction_ratio = contraction_eqn.solve();
 
+    // as well as the chamber length
     auto length = volume / area;
 
+    // ... and the properties of the converging angle
     auto converging_height = radius - throat.radius;
-
     auto converging_length_eqn = (converging_height / SIN(rocket.converging_angle)) * SIN(TORAD(90)-rocket.converging_angle);
     auto converging_length = converging_length_eqn.solve();
 
@@ -486,17 +497,17 @@ Chamber build_chamber(latex::doc::Report& doc, const EngineBasis& rocket, const 
         << svspace
         << make_aligned_eqn(
             StyledVar("L_{estimate}"),
-            initial_est_eqn,
-            scale_to_string(initial_est, 1, mm, "mm")
+            initial_len_est_eqn,
+            scale_to_string(initial_len_est, 1, mm, "mm")
         )
         << svspace
         << make_aligned_eqn(
             StyledVar("D_{estimate}"),
-            initial_radius*2
+            scale_to_string(initial_radius*2, 1, mm, "mm")
         )
         << "Which we can further refine by solving the following via iteration:\n\n"
         << vspace
-        << make_eqn(diameter_var, initial_iter_eqn)
+        << make_eqn(est_diameter_var, initial_iter_eqn)
         << vspace
         << strjoin("Which yields (after", num_iters, "iterations):\n\n")
         << svspace
