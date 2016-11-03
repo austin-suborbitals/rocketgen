@@ -19,9 +19,12 @@ constexpr auto pow(const quantity<D,X>& val, P pwr) {
 
 
 auto mm = meter * milli; // TODO: explain why mult not div
-auto cm = meter * 100;
 auto mm_sq = mm*mm;
 auto mm_cu = mm*mm*mm;
+
+auto cm = meter * centi;
+auto cm_cu = cm*cm*cm;
+
 auto MPa = pascal * 1'000'000;
 
 
@@ -123,6 +126,7 @@ struct EngineBasis {
     double                     expansion_ratio;
     quantity<length_d>         l_star;
     double                     converging_angle;
+    double                     diverging_angle;
     Propellants                propellants;
 };
 
@@ -311,6 +315,8 @@ struct Nozzle {
     quantity<length_d> throat_radius;
     quantity<length_d> exit_radius;
 
+    quantity<length_d> diverging_length;
+
     auto exit_area() const { return (nth_power<2>(exit_radius) * M_PI); }
     auto exit_diameter() const  { return exit_radius * 2; }
 
@@ -353,6 +359,14 @@ Nozzle build_nozzle(latex::doc::Report& doc, const EngineBasis& rocket, const Th
     auto diameter_eqn = StyledValVar<decltype(radius)>(radius, "r") * NUM(2);
     auto diameter = diameter_eqn.solve();
 
+    // the properties of the diverging angle
+    StyledConst<double> ninty_deg_as_rad(TORAD(90), "90\\degree");
+    StyledConst<decltype(rocket.diverging_angle)> angle_var(rocket.diverging_angle, "\\theta");
+    auto diverging_height_eqn = StyledValVar<decltype(radius)>(radius, "R_{nozzle}") - StyledValVar<decltype(throat.radius)>(throat.radius, "R_{throat}");
+    auto diverging_height = diverging_height_eqn.solve();
+    StyledValVar<decltype(diverging_height)> height_var(diverging_height, "R_{diff}");
+    auto diverging_length_eqn = (height_var / SIN(angle_var)) * SIN(ninty_deg_as_rad-angle_var);
+    auto diverging_length = diverging_length_eqn.solve();
 
     geometry
         << vspace
@@ -374,7 +388,23 @@ Nozzle build_nozzle(latex::doc::Report& doc, const EngineBasis& rocket, const Th
             StyledVar("d_{exit}"),
             diameter_eqn,
             scale_to_string(diameter, 1, mm, "mm")
-        );
+        )
+        << svspace
+        << "Via trigonometry we find the nozzle length:\n\n"
+        << svspace
+        << make_aligned_eqn(
+            height_var,
+            diverging_height_eqn,
+            scale_to_string(diverging_height, 1, mm, "mm")
+        )
+        << svspace
+        << make_aligned_eqn(
+            StyledVar("L_{nozzle}"),
+            diverging_length_eqn,
+            scale_to_string(diverging_length, 1, mm, "mm")
+        )
+        << svspace
+        << strjoin("For the given diverging angle of:", TODEG(rocket.diverging_angle), "\\degree\n\n")
     ;
 
 
@@ -383,7 +413,7 @@ Nozzle build_nozzle(latex::doc::Report& doc, const EngineBasis& rocket, const Th
         << geometry;
 
     doc << section;
-    return Nozzle{throat.radius, radius};
+    return Nozzle{throat.radius, radius, diverging_length};
 }
 
 
@@ -394,8 +424,30 @@ Nozzle build_nozzle(latex::doc::Report& doc, const EngineBasis& rocket, const Th
 
 
 struct Chamber {
-    quantity<length_d> radius;
-    quantity<length_d> length;
+    quantity<length_d> flatwall_radius;
+    quantity<length_d> flatwall_length;
+
+    quantity<length_d> converging_length;
+    quantity<length_d> converging_height;
+
+    const quantity<length_d> throat_radius;
+
+    quantity<length_d> diameter() const { return flatwall_radius * 2; }
+    quantity<length_d> total_length() const { return flatwall_length + converging_length; }
+
+    // TODO: express m^2 in return type
+    auto flatwall_area() const { return nth_power<2>(flatwall_radius) * M_PI; }
+
+    // TODO: express m^3 in return type
+    auto flatwall_volume() const { return flatwall_area() * flatwall_length; }
+
+    // TODO: express m^3 in return type
+    auto converging_volume() const {
+        return converging_length /* h */ * (M_PI / 3) * (nth_power<2>(flatwall_radius) + (flatwall_radius * throat_radius) + nth_power<2>(throat_radius));
+    }
+
+    // TODO: express m^3 in return type
+    auto volume() const { return converging_volume() + flatwall_volume(); }
 };
 
 Chamber build_chamber(latex::doc::Report& doc, const EngineBasis& rocket, const Throat& throat) {
@@ -479,9 +531,16 @@ Chamber build_chamber(latex::doc::Report& doc, const EngineBasis& rocket, const 
     auto length = volume / area;
 
     // ... and the properties of the converging angle
-    auto converging_height = radius - throat.radius;
-    auto converging_length_eqn = (converging_height / SIN(rocket.converging_angle)) * SIN(TORAD(90)-rocket.converging_angle);
+    auto converging_height_eqn = StyledValVar<decltype(radius)>(radius, "R_{conv}") - StyledValVar<decltype(throat.radius)>(throat.radius, "R_{throat}");
+    auto converging_height = converging_height_eqn.solve();
+    StyledValVar<decltype(converging_height)> height_var(converging_height, "R_{diff}");
+
+    StyledConst<double> ninty_deg_as_rad(TORAD(90), "90\\degree");
+    auto converging_length_eqn = (height_var / SIN(angle_var)) * SIN(ninty_deg_as_rad-angle_var);
     auto converging_length = converging_length_eqn.solve();
+
+    // and misc
+    auto flat_eqn = StyledValVar<decltype(length)>(length, "L_{chamber}") - StyledValVar<decltype(converging_length)>(converging_length, "L_{conv}");
 
 
     geometry
@@ -540,7 +599,31 @@ Chamber build_chamber(latex::doc::Report& doc, const EngineBasis& rocket, const 
             ),
             scale_to_string(length, 1, mm, "mm")
         )
+        << vspace
+        << "Via trigonometry we find the converging section length:\n\n"
+        << svspace
+        << make_aligned_eqn(
+            height_var,
+            converging_height_eqn,
+            scale_to_string(converging_height, 1, mm, "mm")
+        )
+        << vspace
+        << make_aligned_eqn(
+            StyledVar("L_{conv}"),
+            converging_length_eqn,
+            scale_to_string(converging_length, 1, mm, "mm")
+        )
+        << svspace
+        << "Which then yields:\n\n"
+        << svspace
+        << make_aligned_eqn(
+            StyledVar("L_{flatwall}"),
+            flat_eqn,
+            scale_to_string(flat_eqn.solve(), 1, mm, "mm")
+        )
     ;
+
+    Chamber chamber{radius, length, converging_length, converging_height, throat.radius};
 
     section
         << critical_vars
@@ -551,20 +634,26 @@ Chamber build_chamber(latex::doc::Report& doc, const EngineBasis& rocket, const 
                 << strjoin(PrefixText("Chamber Length:"), scale_to_string(length, 1, mm, "mm"))
                 << strjoin(PrefixText("Chamber Diameter:"), scale_to_string(diameter, 1, mm, "mm"))
                 << strjoin(PrefixText("Chamber Area:"), scale_to_string(area, 1, mm_sq, "mm+2"))
-                << strjoin(PrefixText("Chamber Flat-Wall Length:"), scale_to_string(length-converging_length, 1, mm, "mm"))
-                << strjoin(PrefixText("Converging Height:"), scale_to_string(converging_height, 1, mm, "mm"))
-                << strjoin(PrefixText("Converging Length:"), scale_to_string(converging_length, 1, mm, "mm"))
+                << strjoin(PrefixText("Chamber Flatwall Length:"), scale_to_string(length-converging_length, 1, mm, "mm"))
+                << strjoin(PrefixText("Converging Section Height:"), scale_to_string(converging_height, 1, mm, "mm"))
+                << strjoin(PrefixText("Converging Section Length:"), scale_to_string(converging_length, 1, mm, "mm"))
             )
             << svspace
             << (UnorderedList()
                 << strjoin(PrefixText("Length/Width Ratio:"), length/diameter)
                 << strjoin(PrefixText("Contraction Ratio:"), contraction_ratio)
             )
+            << svspace
+            << (UnorderedList()
+                << strjoin(PrefixText("Flatwall Volume:"),              scale_to_string(chamber.flatwall_volume(), 1, cm_cu, "cm+3"))
+                << strjoin(PrefixText("Converging Section Volume:"),    scale_to_string(chamber.converging_volume(), 1, cm_cu, "cm+3"))
+                << strjoin(PrefixText("Combustible Volume:"),           scale_to_string(chamber.volume(), 1, cm_cu, "cm+3"))
+            )
         )
     ;
 
     doc << section;
-    return Chamber{1*meter, 1*meter};
+    return chamber;
 }
 
 

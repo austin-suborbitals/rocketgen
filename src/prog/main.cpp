@@ -57,6 +57,7 @@ EngineBasis marshal_config(const json& conf) {
         conf["engine"]["expansion_ratio"].get<double>(),
         (conf["engine"]["l_star"].get<double>() * meter),
         TORAD(conf["engine"]["converging_angle"].get<double>()),  // we take in as deg, but calcs need rad
+        TORAD(conf["engine"]["diverging_angle"].get<double>()),  // we take in as deg, but calcs need rad
         Propellants{
             fuel, oxidizer,
             conf["propellant"]["mixture_ratio"].get<double>(),
@@ -124,7 +125,7 @@ int main(int argc, char** argv) {
     build_nozzle(doc, rocket, throat);
     build_chamber(doc, rocket, throat);
 
-    std::cout << doc << std::endl;
+    std::cout << std::setprecision(4) << doc << std::endl;
 
     return 0;
 }
