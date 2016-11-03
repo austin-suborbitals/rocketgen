@@ -59,8 +59,8 @@ NDBGFLAGS = [
     '-O3',
 ]
 
-CXXCOMPILER='g++'
-CCCOMPILER='gcc'
+CXXCOMPILER='g++' if not GetOption('travis') else 'g++-5'
+CCCOMPILER='gcc' if not GetOption('travis') else 'gcc-5'
 
 if GetOption('clang'):
     CXXCOMPILER='clang++' if not GetOption('travis') else 'clang++-3.8'
