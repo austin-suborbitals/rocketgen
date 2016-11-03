@@ -29,11 +29,11 @@ auto MPa = pascal * mega;
 
 
 
-
 #include "ext/cpplatex/latex.hpp"
 
 using namespace latex::doc;
 using namespace latex::math;
+
 
 constexpr static const char* vspace = "\\vspace{10 mm}";
 constexpr static const char* svspace = "\\vspace{6 mm}";
@@ -188,7 +188,7 @@ auto build_throat_area_section(O& os, const EngineBasis& rocket, const T& temp, 
 
     StyledValVar<double> gamma_var(rocket.propellants.gamma, "\\gamma");
 
-    auto flow_half = (NUM(mass_flow)/pressure);
+    auto flow_half = NUM(mass_flow) / NUM(pressure);
     auto temp_part = r_var * NUM(temp);
     auto sqrt_half = (temp_part / gamma_var).sqrt();
     auto area_eqn = flow_half * sqrt_half;

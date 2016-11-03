@@ -24,7 +24,7 @@ COMMONFLAGS=[
     '-I{}'.format(os.path.join(Dir('#').abspath, 'src/')),
 
     # phys units degree symbol
-    '-Wno-invalid-source-encoding',
+    #'-Wno-invalid-source-encoding',
 ]
 
 CPPPATH = [
@@ -41,6 +41,7 @@ CPPFLAGS = [
 GCC_CPPFLAGS = [
     # TODO: GCC 4.9 give ABI incompatibility warnings upgraded to errors  without this
     '-fabi-version=10',
+    '-fmax-errors=10'
 ]
 
 CFLAGS = [
@@ -65,7 +66,8 @@ CCCOMPILER='gcc' if not GetOption('travis') else 'gcc-5'
 if GetOption('clang'):
     CXXCOMPILER='clang++' if not GetOption('travis') else 'clang++-3.8'
     CCCOMPILER='clang' if not GetOption('travis') else 'clang-3.8'
-
+else:
+    CPPFLAGS.extend(GCC_CPPFLAGS)
 
 
 def append_flags(src, to):
