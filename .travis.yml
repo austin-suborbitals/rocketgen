@@ -21,4 +21,4 @@ matrix:
 script:
   - if [ "$COMPILER" = "clang" ]; then scons --clang --travis; fi
   - if [ "$COMPILER" = "gcc" ]; then scons --travis; fi
-  - build_rocket.sh example_config.json example_rocket
+  - ./build_rocket.sh example_config.json example_rocket
