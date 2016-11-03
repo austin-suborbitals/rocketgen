@@ -12,6 +12,7 @@ addons:
       - gcc-5
       - clang-3.8
       - rubber
+      - texlive-latex-extra
 
 matrix:
   include:
