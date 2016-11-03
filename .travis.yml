@@ -10,6 +10,7 @@ addons:
       - scons
       - g++-5
       - gcc-5
+      - clang-3.8
 
 compiler:
   - clang

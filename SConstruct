@@ -43,21 +43,22 @@ def needs_update(subs):
 
 
 # initialize submodules
-get_subs_cmd = [
-    ['git', 'config', '--file', os.path.join(Dir('#').abspath, '.gitmodules'), '--name-only', '--get-regexp', 'path'],
-    ['sed', "s/^submodule\.//"],
-    ['sed', "s/\.path$//"],
-]
-get_subs = subprocess.Popen(get_subs_cmd[0], stdout=subprocess.PIPE)
-filter_sub = subprocess.Popen(get_subs_cmd[1], stdin=get_subs.stdout, stdout=subprocess.PIPE)
-get_subs.wait()
-filter_sub.wait()
-submodules = filter(None, subprocess.check_output(get_subs_cmd[2], stdin=filter_sub.stdout).split('\n'))
-if GetOption('update') or needs_update(submodules) and not GetOption('travis'):
-    print "initializing modules..."
-    subprocess.check_call(['git', 'submodule', 'init'])
-    print "updating modules..."
-    subprocess.check_call(['git', 'submodule', 'update', '--remote'])
+if not GetOption('travis'):
+    get_subs_cmd = [
+        ['git', 'config', '--file', os.path.join(Dir('#').abspath, '.gitmodules'), '--name-only', '--get-regexp', 'path'],
+        ['sed', "s/^submodule\.//"],
+        ['sed', "s/\.path$//"],
+    ]
+    get_subs = subprocess.Popen(get_subs_cmd[0], stdout=subprocess.PIPE)
+    filter_sub = subprocess.Popen(get_subs_cmd[1], stdin=get_subs.stdout, stdout=subprocess.PIPE)
+    get_subs.wait()
+    filter_sub.wait()
+    submodules = filter(None, subprocess.check_output(get_subs_cmd[2], stdin=filter_sub.stdout).split('\n'))
+    if GetOption('update') or needs_update(submodules):
+        print "initializing modules..."
+        subprocess.check_call(['git', 'submodule', 'init'])
+        print "updating modules..."
+        subprocess.check_call(['git', 'submodule', 'update', '--remote'])
 
 env = Environment()
 

@@ -63,10 +63,8 @@ CXXCOMPILER='g++'
 CCCOMPILER='gcc'
 
 if GetOption('clang'):
-    CXXCOMPILER='clang++' if not GetOption('travis') else '/usr/local/clang-3.4/bin/clang++'
-    CCCOMPILER='clang' if not GetOption('travis') else '/usr/local/clang-3.4/bin/clang'
-else:
-    append_flags(GCC_CPPFLAGS, FLAGSET)
+    CXXCOMPILER='clang++' if not GetOption('travis') else '/usr/local/clang-3.8/bin/clang++'
+    CCCOMPILER='clang' if not GetOption('travis') else '/usr/local/clang-3.8/bin/clang'
 
 
 
