@@ -53,7 +53,7 @@ filter_sub = subprocess.Popen(get_subs_cmd[1], stdin=get_subs.stdout, stdout=sub
 get_subs.wait()
 filter_sub.wait()
 submodules = filter(None, subprocess.check_output(get_subs_cmd[2], stdin=filter_sub.stdout).split('\n'))
-if GetOption('update') or needs_update(submodules):
+if GetOption('update') or needs_update(submodules) and not GetOption('travis'):
     print "initializing modules..."
     subprocess.check_call(['git', 'submodule', 'init'])
     print "updating modules..."
