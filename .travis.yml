@@ -12,10 +12,11 @@ addons:
       - gcc-5
       - clang-3.8
 
-compiler:
-  - clang
-  - gcc
+matrix:
+  include:
+    - env: COMPILER=clang
+    - env: COMPILER=gcc
 
 script:
-  - if [ "$CXX" = "clang++" ]; then scons --clang --travis; fi
-  - if [ "$CXX" = "g++" ]; then scons --travis; fi
+  - if [ "$COMPILER" = "clang" ]; then scons --clang --travis; fi
+  - if [ "$COMPILER" = "gcc" ]; then scons --travis; fi
