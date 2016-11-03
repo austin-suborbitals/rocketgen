@@ -33,7 +33,7 @@ CPPPATH = [
 
 CPPFLAGS = [
     # required C++ flags
-    '-std=c++14' if not GetOption('travis') and not GetOption('clang') else '-std=c++1y',
+    '-std=c++14',
 
     '-I{}'.format(os.path.join(Dir('#').abspath, 'src/ext/phys_units')),   # to satisfy the inter-including
 ]
@@ -63,8 +63,8 @@ CXXCOMPILER='g++'
 CCCOMPILER='gcc'
 
 if GetOption('clang'):
-    CXXCOMPILER='clang++' if not GetOption('travis') else '/usr/local/clang-3.8/bin/clang++'
-    CCCOMPILER='clang' if not GetOption('travis') else '/usr/local/clang-3.8/bin/clang'
+    CXXCOMPILER='clang++' if not GetOption('travis') else 'clang++-3.8'
+    CCCOMPILER='clang' if not GetOption('travis') else 'clang-3.8'
 
 
 
