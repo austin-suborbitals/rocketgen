@@ -54,7 +54,6 @@ EngineBasis marshal_config(const json& conf) {
         thrust, isp*second,
         (conf["engine"]["chamber_pressure"].get<double>() * MPa),
         (conf["engine"]["external_pressure"].get<double>() * MPa),
-        conf["engine"]["expansion_ratio"].get<double>(),
         (conf["engine"]["l_star"].get<double>() * meter),
         TORAD(conf["engine"]["converging_angle"].get<double>()),  // we take in as deg, but calcs need rad
         TORAD(conf["engine"]["diverging_angle"].get<double>()),  // we take in as deg, but calcs need rad
@@ -122,8 +121,8 @@ int main(int argc, char** argv) {
     // build and append the overview
     build_overview(doc, rocket);
     auto throat = build_throat(doc, rocket);
-    build_nozzle(doc, rocket, throat);
-    build_chamber(doc, rocket, throat);
+    auto chamber = build_chamber(doc, rocket, throat);
+    build_nozzle(doc, rocket, throat, chamber);
 
     std::cout << std::setprecision(4) << doc << std::endl;
 

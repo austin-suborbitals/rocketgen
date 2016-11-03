@@ -25,7 +25,7 @@ auto mm_cu = mm*mm*mm;
 auto cm = meter * centi;
 auto cm_cu = cm*cm*cm;
 
-auto MPa = pascal * 1'000'000;
+auto MPa = pascal * mega;
 
 
 
@@ -123,7 +123,6 @@ struct EngineBasis {
     quantity<time_interval_d>  isp;
     quantity<pressure_d>       pressure;
     quantity<pressure_d>       external_pressure;
-    double                     expansion_ratio;
     quantity<length_d>         l_star;
     double                     converging_angle;
     double                     diverging_angle;
@@ -311,118 +310,6 @@ Throat build_throat(latex::doc::Report& doc, const EngineBasis& rocket) {
 
 
 
-struct Nozzle {
-    quantity<length_d> throat_radius;
-    quantity<length_d> exit_radius;
-
-    quantity<length_d> diverging_length;
-
-    auto exit_area() const { return (nth_power<2>(exit_radius) * M_PI); }
-    auto exit_diameter() const  { return exit_radius * 2; }
-
-    auto throat_area() const { return (nth_power<2>(throat_radius) * M_PI); }
-    auto throat_diameter() const  { return throat_radius * 2; }
-};
-
-Nozzle build_nozzle(latex::doc::Report& doc, const EngineBasis& rocket, const Throat& throat) {
-    using PrefixText = latex::Text<latex::style::Bold>;
-
-    // open the section
-    latex::doc::Section section("Nozzle", true);
-    section << "Defining characteristics and calculations for the nozzle.\n";
-
-
-    // list our critical constants
-    Subsection critical_vars("Critical Constants");
-    critical_vars << "Underlying constants that form the nozzle profile:";
-    critical_vars << (UnorderedList()
-                        << strjoin(PrefixText("Throat Area: "), scale_to_string(throat.area(), 1, mm_sq, "mm+2"))
-                        << strjoin(PrefixText("Expansion Ratio: "), rocket.expansion_ratio)
-                        // TODO: external pressure?
-                     );
-
-    //
-    // geometry
-    //
-
-    Subsection geometry("Nozzle Geometry");
-    geometry << "The following equations define the geometrical/physical dimensions of the nozzle and exit area.\n\n\n";
-
-    StyledValVar<decltype(throat.area())> area_throat(throat.area(), "A_{throat}");
-
-    auto exit_area_eqn = area_throat * NUM(rocket.expansion_ratio);
-    auto exit_area = exit_area_eqn.solve();
-
-    auto pi_var = StyledConst<double>(M_PI, "\\pi");
-    auto radius_eqn = (NUM(exit_area) / pi_var).sqrt();
-    auto radius = radius_eqn.solve();
-    auto diameter_eqn = StyledValVar<decltype(radius)>(radius, "r") * NUM(2);
-    auto diameter = diameter_eqn.solve();
-
-    // the properties of the diverging angle
-    StyledConst<double> ninty_deg_as_rad(TORAD(90), "90\\degree");
-    StyledConst<decltype(rocket.diverging_angle)> angle_var(rocket.diverging_angle, "\\theta");
-    auto diverging_height_eqn = StyledValVar<decltype(radius)>(radius, "R_{nozzle}") - StyledValVar<decltype(throat.radius)>(throat.radius, "R_{throat}");
-    auto diverging_height = diverging_height_eqn.solve();
-    StyledValVar<decltype(diverging_height)> height_var(diverging_height, "R_{diff}");
-    auto diverging_length_eqn = (height_var / SIN(angle_var)) * SIN(ninty_deg_as_rad-angle_var);
-    auto diverging_length = diverging_length_eqn.solve();
-
-    geometry
-        << vspace
-        << make_aligned_eqn(
-            StyledVar("A_{exit}"),
-            exit_area_eqn,
-            scale_to_string(exit_area, 1, mm_sq, "mm+2")
-        )
-        << vspace
-        << "Just as in the throat calculaions, basic geometry gives us radius and diameter.\n\n\n"
-        << svspace
-        << make_aligned_eqn(
-            StyledVar("r_{exit}"),
-            radius_eqn,
-            scale_to_string(radius, 1, mm, "mm")
-        )
-        << vspace
-        << make_aligned_eqn(
-            StyledVar("d_{exit}"),
-            diameter_eqn,
-            scale_to_string(diameter, 1, mm, "mm")
-        )
-        << svspace
-        << "Via trigonometry we find the nozzle length:\n\n"
-        << svspace
-        << make_aligned_eqn(
-            height_var,
-            diverging_height_eqn,
-            scale_to_string(diverging_height, 1, mm, "mm")
-        )
-        << svspace
-        << make_aligned_eqn(
-            StyledVar("L_{nozzle}"),
-            diverging_length_eqn,
-            scale_to_string(diverging_length, 1, mm, "mm")
-        )
-        << svspace
-        << strjoin("For the given diverging angle of:", TODEG(rocket.diverging_angle), "\\degree\n\n")
-    ;
-
-
-    section
-        << critical_vars
-        << geometry;
-
-    doc << section;
-    return Nozzle{throat.radius, radius, diverging_length};
-}
-
-
-
-
-
-
-
-
 struct Chamber {
     quantity<length_d> flatwall_radius;
     quantity<length_d> flatwall_length;
@@ -430,7 +317,13 @@ struct Chamber {
     quantity<length_d> converging_length;
     quantity<length_d> converging_height;
 
+    quantity<pressure_d> pressure;
+
     const quantity<length_d> throat_radius;
+
+
+
+    // functions
 
     quantity<length_d> diameter() const { return flatwall_radius * 2; }
     quantity<length_d> total_length() const { return flatwall_length + converging_length; }
@@ -623,7 +516,7 @@ Chamber build_chamber(latex::doc::Report& doc, const EngineBasis& rocket, const 
         )
     ;
 
-    Chamber chamber{radius, length, converging_length, converging_height, throat.radius};
+    Chamber chamber{radius, length, converging_length, converging_height, rocket.pressure, throat.radius};
 
     section
         << critical_vars
@@ -655,6 +548,149 @@ Chamber build_chamber(latex::doc::Report& doc, const EngineBasis& rocket, const 
     doc << section;
     return chamber;
 }
+
+
+
+
+struct Nozzle {
+    quantity<length_d> throat_radius;
+    quantity<length_d> exit_radius;
+
+    quantity<length_d> diverging_length;
+
+    auto exit_area() const { return (nth_power<2>(exit_radius) * M_PI); }
+    auto exit_diameter() const  { return exit_radius * 2; }
+
+    auto throat_area() const { return (nth_power<2>(throat_radius) * M_PI); }
+    auto throat_diameter() const  { return throat_radius * 2; }
+};
+
+
+Nozzle build_nozzle(latex::doc::Report& doc, const EngineBasis& rocket, const Throat& throat, const Chamber& chamber) {
+    using PrefixText = latex::Text<latex::style::Bold>;
+
+    // open the section
+    latex::doc::Section section("Nozzle", true);
+    section << "Defining characteristics and calculations for the nozzle.\n";
+
+
+    // list our critical constants
+    Subsection critical_vars("Critical Constants");
+    critical_vars << "Underlying constants that form the nozzle profile:";
+    critical_vars << (UnorderedList()
+                        << strjoin(PrefixText("$P_{ambient}$: "), eng::to_string(rocket.external_pressure))
+                        << strjoin(PrefixText("$P_{chamber}$: "), eng::to_string(chamber.pressure))
+                        << strjoin(PrefixText("$A_{throat}$: "), scale_to_string(throat.area(), 1, mm_sq, "mm"))
+                        << strjoin(PrefixText("Gamma: "), rocket.propellants.gamma)
+                     );
+
+    //
+    // geometry
+    //
+
+    Subsection geometry("Nozzle Geometry");
+    geometry << "The following equations define the geometrical/physical dimensions of the nozzle and exit area.\n\n\n";
+
+    StyledValVar<decltype(rocket.propellants.gamma)> gamma_var(rocket.propellants.gamma, "\\gamma");
+    StyledValVar<decltype(throat.area())> area_throat(throat.area(), "A_{throat}");
+
+    StyledValVar<decltype(chamber.pressure)> chamber_pressure_var(chamber.pressure, "P_{chamber}");
+    StyledValVar<decltype(rocket.external_pressure)> ambient_pressure_var(rocket.external_pressure, "P_{ambient}");
+
+    StyledConst<double> pi_var(M_PI, "\\pi");
+
+    auto mach_sq_eqn = (NUM(2) / (gamma_var - 1)) * ((chamber_pressure_var/ambient_pressure_var).pow((gamma_var-1)/gamma_var) - 1);
+    auto mach_eqn = mach_sq_eqn.sqrt();
+
+    auto mach_sq = mach_sq_eqn.solve();
+    auto mach = mach_eqn.solve();
+
+    auto exit_area_eqn = (area_throat/mach)*((NUM(1) + ((gamma_var-1)/2) * mach_sq) / ((gamma_var + 1) / 2)).pow((gamma_var + 1) / (NUM(2) * (gamma_var-1)));
+    auto exit_area = exit_area_eqn.solve();
+
+    auto radius_eqn = (NUM(exit_area) / pi_var).sqrt();
+    auto radius = radius_eqn.solve();
+    auto diameter_eqn = StyledValVar<decltype(radius)>(radius, "r") * NUM(2);
+    auto diameter = diameter_eqn.solve();
+
+
+    // the properties of the diverging angle
+    StyledConst<double> ninty_deg_as_rad(TORAD(90), "90\\degree");
+    StyledConst<decltype(rocket.diverging_angle)> angle_var(rocket.diverging_angle, "\\theta");
+    auto diverging_height_eqn = StyledValVar<decltype(radius)>(radius, "R_{nozzle}") - StyledValVar<decltype(throat.radius)>(throat.radius, "R_{throat}");
+    auto diverging_height = diverging_height_eqn.solve();
+    StyledValVar<decltype(diverging_height)> height_var(diverging_height, "R_{diff}");
+    auto diverging_length_eqn = (height_var / SIN(angle_var)) * SIN(ninty_deg_as_rad-angle_var);
+    auto diverging_length = diverging_length_eqn.solve();
+
+    geometry
+        << "First we solve for the mach number:\n\n"
+        << make_aligned_eqn(
+            StyledVar("N_{mach}"),
+            mach_eqn,
+            mach
+        )
+        << svspace
+        << "We can now find the appropriate exit area:\n\n"
+        << vspace
+        << make_aligned_eqn(
+            StyledVar("A_{exit}"),
+            exit_area_eqn,
+            scale_to_string(exit_area, 1, mm_sq, "mm+2")
+        )
+        << vspace
+        << "Just as in the throat calculaions, basic geometry gives us radius and diameter.\n\n\n"
+        << svspace
+        << make_aligned_eqn(
+            StyledVar("r_{exit}"),
+            radius_eqn,
+            scale_to_string(radius, 1, mm, "mm")
+        )
+        << vspace
+        << make_aligned_eqn(
+            StyledVar("d_{exit}"),
+            diameter_eqn,
+            scale_to_string(diameter, 1, mm, "mm")
+        )
+        << svspace
+        << "Via trigonometry we find the nozzle length:\n\n"
+        << svspace
+        << make_aligned_eqn(
+            height_var,
+            diverging_height_eqn,
+            scale_to_string(diverging_height, 1, mm, "mm")
+        )
+        << svspace
+        << make_aligned_eqn(
+            StyledVar("L_{nozzle}"),
+            diverging_length_eqn,
+            scale_to_string(diverging_length, 1, mm, "mm")
+        )
+        << svspace
+        << strjoin("For the given diverging angle of:", TODEG(rocket.diverging_angle), "\\degree\n\n")
+        << vspace
+    ;
+
+
+    section
+        << critical_vars
+        << geometry
+        << (Subsection("Summary")
+            << (UnorderedList() 
+                << strjoin(PrefixText("Gas Mach Number: "),     mach)
+                << strjoin(PrefixText("Nozzle Length: "),       scale_to_string(diverging_length, 1, mm, "mm"))
+                << strjoin(PrefixText("Nozzle Radius: "),       scale_to_string(radius, 1, mm, "mm"))
+                << strjoin(PrefixText("Nozzle Diameter: "),     scale_to_string(diameter, 1, mm, "mm"))
+                << strjoin(PrefixText("Diverging Angle: "),     TODEG(rocket.diverging_angle), "\\degree")
+            )
+        );
+
+    doc << section;
+    return Nozzle{throat.radius, radius, diverging_length};
+}
+
+
+
 
 
 #endif

@@ -14,9 +14,6 @@
         "_": "external pressure is in MPa",
         "external_pressure": 0.1013529,
 
-        "_": "expansion ratio is unitless",
-        "expansion_ratio": 3.65,
-
         "_": "l_star is given in meters",
         "l_star": 0.6,
 
