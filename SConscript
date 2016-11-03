@@ -33,7 +33,8 @@ CPPPATH = [
 
 CPPFLAGS = [
     # required C++ flags
-    '-std=c++14',
+    '-std=c++14' if not GetOption('travis') and not GetOption('clang') else '-std=c++1y',
+
     '-I{}'.format(os.path.join(Dir('#').abspath, 'src/ext/phys_units')),   # to satisfy the inter-including
 ]
 
@@ -44,7 +45,7 @@ GCC_CPPFLAGS = [
 
 CFLAGS = [
     # required C flags
-    '-std=c11',
+    '-std=c14',
 ]
 
 DBGFLAGS = [
@@ -61,6 +62,14 @@ NDBGFLAGS = [
 CXXCOMPILER='g++'
 CCCOMPILER='gcc'
 
+if GetOption('clang'):
+    CXXCOMPILER='clang++' if not GetOption('travis') else '/usr/local/clang-3.4/bin/clang++'
+    CCCOMPILER='clang' if not GetOption('travis') else '/usr/local/clang-3.4/bin/clang'
+else:
+    append_flags(GCC_CPPFLAGS, FLAGSET)
+
+
+
 def append_flags(src, to):
     for i in src:
         if i not in to:
@@ -73,12 +82,6 @@ if GetOption('dbg'):
     append_flags(DBGFLAGS, FLAGSET)
 else:
     append_flags(NDBGFLAGS, FLAGSET)
-
-if GetOption('clang'):
-    CXXCOMPILER='clang++'
-    CCCOMPILER='clang'
-else:
-    append_flags(GCC_CPPFLAGS, FLAGSET)
 
 
 ##

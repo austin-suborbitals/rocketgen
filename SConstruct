@@ -25,13 +25,13 @@ AddOption('--ugly',
     action='store_true',
     help='print the entire file-compilation string rather than pretty-printing'
 )
-AddOption('--valgrind',
-    action='store_true',
-    help='run the tests under valgrind'
-)
 AddOption('--update',
     action='store_true',
     help='init and update any submodules'
+)
+AddOption('--travis',
+    action='store_true',
+    help='change compilers for travis'
 )
 
 

@@ -1,0 +1,20 @@
+sudo: false
+language: cpp
+
+addons:
+  apt:
+    sources:
+      - llvm-toolchain-precise
+      - ubuntu-toolchain-r-test
+    packages:
+      - scons
+      - g++-5
+      - gcc-5
+
+compiler:
+  - clang
+  - gcc
+
+script:
+  - if [ "$CXX" = "clang++" ]; then scons --clang --travis; fi
+  - if [ "$CXX" = "g++" ]; then scons --travis; fi
