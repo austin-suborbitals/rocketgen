@@ -1,0 +1,25 @@
+sudo: false
+language: generic
+
+addons:
+  apt:
+    sources:
+      - llvm-toolchain-precise-3.8
+      - ubuntu-toolchain-r-test
+    packages:
+      - scons
+      - g++-5
+      - gcc-5
+      - clang-3.8
+      - rubber
+      - texlive-latex-extra
+
+matrix:
+  include:
+    - env: COMPILER=clang
+    - env: COMPILER=gcc
+
+script:
+  - if [ "$COMPILER" = "clang" ]; then scons --clang --travis; fi
+  - if [ "$COMPILER" = "gcc" ]; then scons --travis; fi
+  - ./build_rocket.sh example_config.json example_rocket

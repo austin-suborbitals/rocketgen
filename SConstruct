@@ -1,8 +1,9 @@
 EnsurePythonVersion(2,7)
 
 import os
+import subprocess
 
-PROJ_NAME = 'flatradix'
+PROJ_NAME = 'rocketgen'
 PROJ_SRC = 'src'
 
 AddOption('--out',
@@ -24,10 +25,40 @@ AddOption('--ugly',
     action='store_true',
     help='print the entire file-compilation string rather than pretty-printing'
 )
-AddOption('--valgrind',
+AddOption('--update',
     action='store_true',
-    help='run the tests under valgrind'
+    help='init and update any submodules'
 )
+AddOption('--travis',
+    action='store_true',
+    help='change compilers for travis'
+)
+
+
+def needs_update(subs):
+    for mod in submodules:
+        if GetOption('update') or not len([f for f in os.listdir(mod) if os.path.isfile(os.path.join(mod, f))]):
+            return True
+    return False
+
+
+# initialize submodules
+if not GetOption('travis') or GetOption('update'): # enable force update even under travis
+    get_subs_cmd = [
+        ['git', 'config', '--file', os.path.join(Dir('#').abspath, '.gitmodules'), '--name-only', '--get-regexp', 'path'],
+        ['sed', "s/^submodule\.//"],
+        ['sed', "s/\.path$//"],
+    ]
+    get_subs = subprocess.Popen(get_subs_cmd[0], stdout=subprocess.PIPE)
+    filter_sub = subprocess.Popen(get_subs_cmd[1], stdin=get_subs.stdout, stdout=subprocess.PIPE)
+    get_subs.wait()
+    filter_sub.wait()
+    submodules = filter(None, subprocess.check_output(get_subs_cmd[2], stdin=filter_sub.stdout).split('\n'))
+    if GetOption('update') or needs_update(submodules):
+        print "initializing modules..."
+        subprocess.check_call(['git', 'submodule', 'init'])
+        print "updating modules..."
+        subprocess.check_call(['git', 'submodule', 'update', '--remote'])
 
 env = Environment()
 

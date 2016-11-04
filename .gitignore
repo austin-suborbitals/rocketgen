@@ -6,3 +6,4 @@ bin/
 *.dblite
 *.swo
 *.swp
+.ycm_extra_conf*

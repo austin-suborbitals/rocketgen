@@ -1,10 +1,40 @@
 {
+    "name": "example",
+    "version": "0.1.0",
     "engine": {
-        "thrust": 333
+        "_": "thrust is in Netwons",
+        "thrust": 500,
+
+        "_": "isp is in second",
+        "isp": 248,
+
+        "_": "pressure is in MPa",
+        "chamber_pressure": 2.068,
+
+        "_": "external pressure is in MPa",
+        "external_pressure": 0.1013529,
+
+        "_": "l_star is given in meters",
+        "l_star": 0.6,
+
+        "_": "angles are given in degrees",
+        "converging_angle": 30,
+        "diverging_angle": 15
     },
+
+    "_": "molar masses are in g/mol",
     "propellant": {
-        "expected_isp": 321,
+        "_": "gamma is in unitless",
+        "gamma": 1.2,
+
+        "_": "flame tempurature is in kelvin",
+        "flame_temp": 3048.889,
+
+        "_": "mixture ratio is unitless",
         "mixture_ratio": 1.2,
+
+        "_": "average combustion weight is in g/mol",
+        "avg_combustion_weight": 26.68,
         "fuel": {
             "name": "methanol",
             "molar_mass": 123.456

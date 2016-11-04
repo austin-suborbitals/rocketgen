@@ -7,8 +7,6 @@ env = global_env.Clone()
 if 'TERM' in os.environ:
     env['ENV']['TERM'] = os.environ['TERM']
 
-env.Append(LIBS = 'librocketgen_static')
-
 
 outdir = GetOption('outdir')
 curr_path = os.path.join(Dir('#').abspath, 'src/prog')

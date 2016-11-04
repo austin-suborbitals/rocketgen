@@ -21,6 +21,10 @@ COMMONFLAGS=[
     '-Wall',
     '-Wextra',
     '-Werror',
+    '-I{}'.format(os.path.join(Dir('#').abspath, 'src/')),
+
+    # phys units degree symbol
+    #'-Wno-invalid-source-encoding',
 ]
 
 CPPPATH = [
@@ -29,18 +33,20 @@ CPPPATH = [
 
 CPPFLAGS = [
     # required C++ flags
-    '-std=c++11',
+    '-std=c++14',
+
     '-I{}'.format(os.path.join(Dir('#').abspath, 'src/ext/phys_units')),   # to satisfy the inter-including
 ]
 
 GCC_CPPFLAGS = [
     # TODO: GCC 4.9 give ABI incompatibility warnings upgraded to errors  without this
     '-fabi-version=10',
+    '-fmax-errors=10'
 ]
 
 CFLAGS = [
     # required C flags
-    '-std=c11',
+    '-std=c14',
 ]
 
 DBGFLAGS = [
@@ -54,8 +60,15 @@ NDBGFLAGS = [
     '-O3',
 ]
 
-CXXCOMPILER='g++'
-CCCOMPILER='gcc'
+CXXCOMPILER='g++' if not GetOption('travis') else 'g++-5'
+CCCOMPILER='gcc' if not GetOption('travis') else 'gcc-5'
+
+if GetOption('clang'):
+    CXXCOMPILER='clang++' if not GetOption('travis') else 'clang++-3.8'
+    CCCOMPILER='clang' if not GetOption('travis') else 'clang-3.8'
+else:
+    CPPFLAGS.extend(GCC_CPPFLAGS)
+
 
 def append_flags(src, to):
     for i in src:
@@ -69,12 +82,6 @@ if GetOption('dbg'):
     append_flags(DBGFLAGS, FLAGSET)
 else:
     append_flags(NDBGFLAGS, FLAGSET)
-
-if GetOption('clang'):
-    CXXCOMPILER='clang++'
-    CCCOMPILER='clang'
-else:
-    append_flags(GCC_CPPFLAGS, FLAGSET)
 
 
 ##
@@ -105,7 +112,6 @@ AddMethod(Environment, get_files)
 builds = [
     # add jobs here
     'src/prog',
-    'src/lib',
 ]
 for b in builds:
     idir =  os.path.join(Dir('#').abspath, b)

@@ -1,8 +1,7 @@
-#include "../ext/cxxopts/src/cxxopts.hpp"
-#include "../ext/json/src/json.hpp"
+#include "ext/cxxopts/src/cxxopts.hpp"
+#include "ext/json/src/json.hpp"
 
-#include "util.hpp"
-#include "../lib/rocketgen.hpp"
+#include "rocketgen.hpp"
 
 using namespace nlohmann; // get access to bare json:: namespace
 
@@ -35,20 +34,97 @@ cxxopts::Options handle_options(int argc, char** argv) {
     return opts;
 }
 
+EngineBasis marshal_config(const json& conf) {
+    Fuel fuel{
+        conf["propellant"]["fuel"]["name"].get<std::string>(),
+        conf["propellant"]["fuel"]["molar_mass"].get<double>()
+    };
+
+    Oxidizer oxidizer{
+        conf["propellant"]["oxidizer"]["name"].get<std::string>(),
+        conf["propellant"]["oxidizer"]["molar_mass"].get<double>()
+    };
+
+    auto thrust = (conf["engine"]["thrust"].get<double>() * newton);
+    auto isp = conf["engine"]["isp"].get<double>();
+
+    return EngineBasis{
+        conf["name"].get<std::string>(),
+        conf["version"].get<std::string>(),
+        thrust, isp*second,
+        (conf["engine"]["chamber_pressure"].get<double>() * MPa),
+        (conf["engine"]["external_pressure"].get<double>() * MPa),
+        (conf["engine"]["l_star"].get<double>() * meter),
+        TORAD(conf["engine"]["converging_angle"].get<double>()),  // we take in as deg, but calcs need rad
+        TORAD(conf["engine"]["diverging_angle"].get<double>()),  // we take in as deg, but calcs need rad
+        Propellants{
+            fuel, oxidizer,
+            conf["propellant"]["mixture_ratio"].get<double>(),
+            conf["propellant"]["gamma"].get<double>(),
+            conf["propellant"]["avg_combustion_weight"].get<double>() * gram,
+            (conf["propellant"]["flame_temp"].get<double>() + 273.15) * kelvin
+        }
+    };
+}
+
+void build_overview(latex::doc::Report& doc, const EngineBasis& rocket) {
+    using PrefixText = latex::Text<latex::style::Large, latex::style::Bold>;
+
+    auto mass_flow = calc_mass_flow(rocket.thrust, rocket.isp);
+    auto fuel_flow_rate = mass_flow / (rocket.propellants.mixture_ratio + 1); // TODO: +1?
+
+    latex::doc::Section overview("Overview", true);
+    overview
+        << "A brief overview of the target-metrics for the engine." << "\n\n"
+        << vspace
+        << (latex::doc::UnorderedList()
+                << strjoin(PrefixText("Thrust: "), rocket.thrust)
+                << strjoin(PrefixText("Isp: "), rocket.isp)
+                << strjoin(PrefixText("Chamber Pressure: "), eng::to_string(rocket.pressure))
+                << PrefixText("Propellants: ")
+                << (latex::doc::UnorderedList()
+                    << strjoin(PrefixText("Mixture Ratio: "), rocket.propellants.mixture_ratio)
+                    << strjoin(PrefixText("Total Mass Flow Rate: "), mass_flow)
+                    << PrefixText("Fuel: ")
+                    << (latex::doc::UnorderedList()
+                        << strjoin(PrefixText("Type: "), rocket.propellants.fuel.name)
+                        << strjoin(PrefixText("Mass Flow Rate: "), fuel_flow_rate)
+                    )
+                    << PrefixText("Oxidizer: ")
+                    << (latex::doc::UnorderedList()
+                        << strjoin(PrefixText("Type: "), rocket.propellants.oxidizer.name)
+                        << strjoin(PrefixText("Mass Flow Rate: "), (mass_flow - fuel_flow_rate))
+                    )
+                )
+           );
+
+    doc << overview;
+}
+
+
 int main(int argc, char** argv) {
     auto opts = handle_options(argc, argv);
     auto conf_str = read_file(opts["config"].as<std::string>());
-    auto conf = json::parse(conf_str);
+    auto rocket = marshal_config(json::parse(conf_str));
 
-    auto thrust = conf["engine"]["thrust"].get<double>() * newton;
-    auto isp = conf["propellant"]["expected_isp"].get<double>() * second;
+    auto doc = Report(
+        strjoin(rocket.name, rocket.version),
+        strjoin(
+            rocket.thrust,
+            rocket.propellants.fuel.name, "/", rocket.propellants.oxidizer.name,
+            "Liquid Rocket Engine"
+        )
+    )
+    .use("amsmath")
+    .use("gensymb");
 
-    auto total_flow_rate = thrust / (isp * GRAVITY);
-    auto fuel_flow_rate = total_flow_rate / (conf["propellant"]["mixture_ratio"].get<double>() + 1); // TODO: +1?
+    // build and append the overview
+    build_overview(doc, rocket);
+    auto throat = build_throat(doc, rocket);
+    auto chamber = build_chamber(doc, rocket, throat);
+    build_nozzle(doc, rocket, throat, chamber);
 
-    std::cout << "Total propellant flow rate: " << total_flow_rate << std::endl;
-    std::cout << "Fuel flow rate: " << fuel_flow_rate << std::endl;
-    std::cout << "Oxidizer flow rate: " << (total_flow_rate - fuel_flow_rate) << std::endl;
+    std::cout << std::setprecision(4) << doc << std::endl;
 
     return 0;
 }
